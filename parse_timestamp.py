@@ -1,7 +1,6 @@
-from datetime import datetime, timezone, timedelta
 import sqlite3
-import struct
-import os
+
+from structure_print import convert_windows_timestamp
 
 def init_timestomp_db(conn):
     cursor = conn.cursor()
@@ -124,24 +123,6 @@ def extract_timestamps_file_name(data_hex: str, attr_offset: int, utc: int):
         times[field_idx] = convert_windows_timestamp(hex_str, utc)
 
     return times
-
-def convert_windows_timestamp(hex_str, utc=0):
-    try:
-        if isinstance(utc, str):
-            utc = int(utc)
-
-        timestamp = struct.unpack("<Q", bytes.fromhex(hex_str))[0]
-        if timestamp == 0:
-            return None
-
-        utc_time = datetime(1970, 1, 1, tzinfo=timezone.utc) + \
-                   timedelta(seconds=(timestamp - 116444736000000000) / 10_000_000)
-        target_tz = timezone(timedelta(hours=utc))
-        local_time = utc_time.astimezone(target_tz)
-
-        return local_time.strftime("%Y-%m-%d %H:%M:%S")
-    except Exception:
-        return None
 
 def parse_timestomp(log_record_db_path, utc_offset):
     conn = sqlite3.connect(log_record_db_path)

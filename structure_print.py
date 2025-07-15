@@ -1,11 +1,44 @@
+from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass
+import struct
 
 PAGE_SIZE = 0x1000
 RECORD_HEADER_SIZE = 0x30
+MFT_ENTRY_SIZE = 0x400
+MFT_ENTRY_HEADER_SIZE = 0x38
 
-RSTR_HEADER_STRUCTURE = '<4sHHQIIHHH18sQHHI'  # 4sHHQ IIHHH 18s QHHI 0x40
+RSTR_HEADER_STRUCTURE = '<4sHHQIIHHH18sQHHI'  # 4sHHQ IIHHH 18s QHHI (Size = 0x40)
 RCRD_HEADER_STRUCTURE = '<4sHHQIHHHHIQ'  # 4sHHQ IHHHHI Q (Size = 0x28)
 RECORD_HEADER_STRUCTURE = '<QQQIIIIH6sHHHHHHHHHHHHQQ'  # QQ QII IIH6s HHHHHHHH HHHHQ Q (Size = 0x58)
+MFT_ENTRY_HEADER = '<IHHQHHHHIIQHHIQ'  # IHHQ HHHHII QHHI Q (Size = 0x38)
+ATTRIBUTE_HEADER_STRUCTURE = '<IIBBHHHQ'  # IIBBHHH Q (Size = 0x18)
+SI_FN_TIME_STRUCTURE = '<QQQQ'  # QQ QQ (Size = 0x20)
+
+def read_struct(f, fmt, cls=None):
+    size = struct.calcsize(fmt)
+    buf = f.read(size)
+    if len(buf) != size:
+        raise EOFError(f"need {size} bytes, got {len(buf)}")
+    data = struct.unpack(fmt, buf)
+    return cls(*data) if cls else data
+
+def convert_windows_timestamp(hex_str, utc=0):
+    try:
+        if isinstance(utc, str):
+            utc = int(utc)
+
+        timestamp = struct.unpack("<Q", bytes.fromhex(hex_str))[0]
+        if timestamp == 0:
+            return None
+
+        utc_time = datetime(1970, 1, 1, tzinfo=timezone.utc) + \
+                   timedelta(seconds=(timestamp - 116444736000000000) / 10_000_000)
+        target_tz = timezone(timedelta(hours=utc))
+        local_time = utc_time.astimezone(target_tz)
+
+        return local_time.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return None
 
 @dataclass
 class RSTRHeader:
@@ -152,3 +185,39 @@ OPCODE_MAP = {
     0x20: "Transaction Table Dump",
     0x21: "Update Record Data Root",
 }
+
+@dataclass
+class AttributeHeader:
+    attr_type: int
+    attr_length: int
+    resident_flag: int
+    name_length: int
+    name_offset: int
+    flag: int
+    attr_identifier: int
+    unknown: int
+
+@dataclass
+class SIFNTime:
+    creation_time: int
+    mft_modified_time: int
+    modified_time: int
+    access_time: int
+
+@dataclass
+class MFTEntryHeader:
+    signature: int
+    fixup_array_offset: int
+    fixup_entry_count: int
+    lsn: int
+    sequence_number: int
+    hard_link_count: int
+    first_attr_offset: int
+    flags: int
+    real_size: int
+    allocated_size: int
+    file_reference_entry: int
+    next_attr_id: int
+    align_to_4: int
+    mft_entry_number: int
+    unknown: int

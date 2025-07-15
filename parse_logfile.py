@@ -5,6 +5,7 @@ import sys
 import os
 
 from structure_print import (
+    read_struct,
     RSTR_HEADER_STRUCTURE, RSTRHeader, print_rstr_header,
     RCRD_HEADER_STRUCTURE, RCRDHeader, print_rcrd_header,
     RECORD_HEADER_STRUCTURE, LogRecordHeader, print_log_record_header,
@@ -86,13 +87,6 @@ def read_record_header(record_offset, logfile):
     record_header = read_struct(logfile, RECORD_HEADER_STRUCTURE, LogRecordHeader)
     
     return record_header
-
-def read_struct(image_file, structure, cls=None):
-    struct_size = struct.calcsize(structure)
-    buffer = image_file.read(struct_size)
-    unpacked_data = struct.unpack(structure, buffer)
-
-    return cls(*unpacked_data) if cls else unpacked_data
 
 def find_hex(logfile_data, search_hexs, byte_size):
     if not isinstance(search_hexs, list):
